@@ -54,6 +54,7 @@ BNO055 IMU ──I²C──> Arduino Nano ──> Attitude data
 | `calibration_check/calibration_check.ino` | Streams accelerometer data plus the BNO055's calibration status, to check calibration before attitude work |
 | `accel_tilt/accel_tilt.ino` | Computes tilt angles (pitch and roll) from the accelerometer, alongside acceleration in g and calibration status |
 | `accel_tilt_filtered/accel_tilt_filtered.ino` | Adds a low-pass filter to the accelerometer tilt angles, printing raw and filtered pitch and roll |
+| `gyro_tilt/gyro_tilt.ino` | Adds pitch and roll from integrating the gyroscope, alongside the raw and filtered accelerometer angles |
 
 ## Output Format
 
@@ -103,11 +104,29 @@ filtered_new = 0.9 * filtered_old + 0.1 * measured
 
 Weighting the previous estimate heavily reduces jitter from vibration and sensor noise, at the cost of slower response to real orientation changes. The filter currently starts from 0, so the filtered angles ramp up over the first couple of seconds after power-on.
 
+### gyro_tilt
+
+Each sample prints one CSV line, about 10 Hz:
+
+```
+accel_x,accel_y,accel_z,accel_cal,gyro_cal,mag_cal,sys_cal,theta,phi,theta_filt,phi_filt,theta_gyro,phi_gyro
+```
+
+The first eleven fields match `accel_tilt_filtered`, except that the low-pass filter here is weighted 0.8 previous / 0.2 new. `theta_gyro` and `phi_gyro` are in degrees, found by integrating the gyroscope's angular rate over the measured time step:
+
+```
+theta_gyro += gyro_y * dt
+phi_gyro   -= gyro_x * dt
+```
+
+Gyro angles respond quickly and ignore vibration, but small rate errors add up over time, so they drift. The accelerometer angles don't drift but are noisy. Combining the two is the next step.
+
 ## Roadmap
 
 - [x] Read raw accelerometer, gyroscope, and magnetometer data
 - [x] Tilt angles (pitch / roll) from the accelerometer (`accel_tilt`)
 - [x] Low-pass filtered tilt angles (`accel_tilt_filtered`)
+- [x] Tilt angles from the integrated gyroscope (`gyro_tilt`)
 - [ ] Initialize filter with first measured angle to eliminate startup ramp
 - [ ] Fuse gyro data (complementary filter) for faster response without the lag
 - [ ] Output fused orientation (quaternion / Euler angles)
