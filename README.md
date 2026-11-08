@@ -16,7 +16,7 @@ BNO055 IMU ──I²C──> Arduino Nano ──> Attitude data
                                               displays live attitude for the ground crew
 ```
 
-- **This repo (current):** IMU interface and data output
+- **This repo (current):** IMU interface, data output, and the PC-side serial receiver
 - **Reaction wheel controller:** separate unit that uses the attitude
   data to correct orientation
 - **Ground GUI (planned):** visualizes the satellite's attitude in real time
@@ -57,6 +57,15 @@ BNO055 IMU ──I²C──> Arduino Nano ──> Attitude data
 | `gyro_tilt/gyro_tilt.ino` | Adds pitch and roll from integrating the gyroscope, alongside the raw and filtered accelerometer angles |
 | `complementary_filter/complementary_filter.ino` | Fuses the gyroscope and accelerometer angles with a complementary filter for fast, drift-free pitch and roll |
 | `tilt_compensated_heading/tilt_compensated_heading.ino` | Initializes all filters from the first measured angle and adds a tilt-compensated magnetometer heading (yaw) |
+| `attitude_stream/attitude_stream.ino` | **Main sketch.** Streams only calibration status and the final pitch, roll, and yaw for the ground station |
+
+### Ground Station
+
+| Script | Purpose |
+|---|---|
+| `ground_station/catch_data.py` | Reads the `attitude_stream` serial output on a PC and prints calibration status, pitch, roll, and yaw |
+
+Requires Python 3 and pySerial (`pip install pyserial`). The serial port is set to `com3` in the script; change it to match your Nano's port (for example `/dev/ttyUSB0` on Linux). Close the Arduino Serial Monitor first, since only one program can open the port at a time.
 
 ## Output Format
 
@@ -162,6 +171,16 @@ psi = atan2(Ym, Xm)
 
 Without tilt compensation, the heading would swing whenever the board pitches or rolls. The magnetometer should be calibrated (`mag_cal` = 3) for an accurate heading.
 
+### attitude_stream
+
+Each sample prints one CSV line, about 10 Hz:
+
+```
+accel_cal,gyro_cal,mag_cal,sys_cal,pitch,roll,yaw
+```
+
+The math is the same as `tilt_compensated_heading`; only the output is trimmed to what the ground station needs. `pitch` and `roll` are the complementary-filter angles and `yaw` is the tilt-compensated heading, all in degrees. Calibration values run from 0 to 3. `ground_station/catch_data.py` parses exactly this format.
+
 ## Roadmap
 
 - [x] Read raw accelerometer, gyroscope, and magnetometer data
@@ -171,9 +190,7 @@ Without tilt compensation, the heading would swing whenever the board pitches or
 - [x] Initialize filter with first measured angle to eliminate startup ramp (`tilt_compensated_heading`)
 - [x] Fuse gyro data (complementary filter) for faster response without the lag (`complementary_filter`)
 - [x] Tilt-compensated magnetometer heading / yaw (`tilt_compensated_heading`)
-- [ ] Output fused orientation (quaternion / Euler angles)
-- [ ] Sensor calibration routine (in progress: `calibration_check` reports calibration status)
-- [ ] Interface to the reaction wheel controller
+- [x] Stream final attitude to a PC over serial (`attitude_stream`, `ground_station/catch_data.py`)
 - [ ] Ground station GUI for live attitude display
 
 ## License
